@@ -1,0 +1,42 @@
+[project]
+name = "augur"
+version = "0.1.0"
+description = "Quantitative research library personal"
+readme = "README.md"
+authors = [
+    { name = "eugnes03", email = "eugennesbakken@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "pandas>=3.0.5",
+    "pandera>=0.32.1",
+    "yfinance>=1.5.2",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.16,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.164.0",
+    "mypy>=2.3.0",
+    "pandas-stubs>=3.0.5.260730",
+    "pytest>=9.1.1",
+    "ruff>=0.16.1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "N", "PD"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+
+[[tool.mypy.overrides]]
+module = "yfinance"
+ignore_missing_imports = true

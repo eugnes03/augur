@@ -216,3 +216,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# augur: raw/derived data should never be committed, but keep placeholders
+augur/data/*
+!augur/data/**/
+!augur/data/**/.gitkeep
+
+
+# .env file not commited 
+
+.env

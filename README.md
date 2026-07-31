@@ -1,2 +1,2 @@
 # augur
-Quantitative research framework
+Quantitative research framework that I will incrimentally improve. 
