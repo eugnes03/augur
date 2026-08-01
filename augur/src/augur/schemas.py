@@ -1,21 +1,46 @@
-import pandas as pd  # noqa: F401
-import pandera as pa  # noqa: F401
+import pandas as pd
+import pandera as pa
+from pandera.typing import Index, Series
 
 
-class BarSchema:
+class BarSchema(pa.DataFrameModel):
     """
     Pandera schema for a single-ticker OHLCV bar DataFrame.
 
-    Expected shape (to be implemented):
+    Shape:
     - DatetimeIndex named 'timestamp', dtype datetime64[ns, UTC]
     - columns: open, high, low, close, adj_close (float64), volume (int64)
     - strict=True, coerce=False
-
-    TODO (not yet implemented):
-    - field-level constraints (e.g. non-negative volume, positive prices)
-    - a dataframe-level check for OHLC consistency
-      (low <= open/close <= high)
-    - a dataframe-level check for index monotonicity (sorted, no duplicates)
     """
 
-    raise NotImplementedError("BarSchema fields and checks not yet defined")
+    open: Series[float] = pa.Field(gt=0)
+    high: Series[float] = pa.Field(gt=0)
+    low: Series[float] = pa.Field(gt=0)
+    close: Series[float] = pa.Field(gt=0)
+    adj_close: Series[float] = pa.Field(gt=0)
+    volume: Series[int] = pa.Field(ge=0)
+
+    timestamp: Index[pd.DatetimeTZDtype] = pa.Field(
+        dtype_kwargs={"unit": "ns", "tz": "UTC"},
+        check_name=True,
+        unique=True,
+    )
+
+    class Config:
+        strict = True
+        coerce = False
+
+    @pa.dataframe_check
+    def ohlc_consistent(cls, df: pd.DataFrame) -> pd.Series:  # type: ignore[misc]  # noqa: N805
+        """low must be the min and high must be the max of each bar."""
+        return (
+            (df["low"] <= df["open"])
+            & (df["low"] <= df["close"])
+            & (df["low"] <= df["high"])
+            & (df["high"] >= df["open"])
+            & (df["high"] >= df["close"])
+        )
+
+    @pa.dataframe_check
+    def index_sorted(cls, df: pd.DataFrame) -> bool:  # type: ignore[misc]  # noqa: N805
+        return bool(df.index.is_monotonic_increasing)
