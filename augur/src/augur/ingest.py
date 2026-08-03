@@ -1,7 +1,12 @@
+import logging
+
 import pandas as pd
 import yfinance as yf
 
-from augur.schemas import BarSchema
+from augur.schemas import BarSchema, PanelBarSchema
+from augur.universe import get_universe
+
+logger = logging.getLogger(__name__)
 
 _SESSION_CLOSE_TIME = "16:00"
 _SESSION_CLOSE_TZ = "America/New_York"
@@ -24,6 +29,50 @@ def fetch_bars(ticker: str, start: str, end: str) -> pd.DataFrame:
     raw = _fetch_raw(ticker, start, end)
     bars = _normalize(raw, ticker)
     return BarSchema.validate(bars)
+
+
+def fetch_universe_bars(
+    start: str, end: str, tickers: list[str] | None = None
+) -> dict[str, pd.DataFrame]:
+    """
+    Fetch BarSchema-validated OHLCV bars for every ticker in the research
+    universe, keyed by ticker.
+
+    Defaults to the tickers in universe.get_universe(); pass `tickers` to
+    fetch a subset instead (useful for tests or ad-hoc exploration).
+
+    A ticker whose fetch fails (network error, missing data, schema
+    violation, etc.) is logged and skipped rather than failing the whole
+    batch — one bad ticker shouldn't block the rest of the universe. A
+    ticker that "succeeds" with zero rows (e.g. yfinance silently
+    returning nothing for an invalid symbol) is likewise logged and
+    skipped, since an empty frame trivially passes BarSchema.
+    """
+    tickers = tickers if tickers is not None else get_universe()
+    bars: dict[str, pd.DataFrame] = {}
+    for ticker in tickers:
+        try:
+            ticker_bars = fetch_bars(ticker, start, end)
+        except Exception:
+            logger.warning("Failed to fetch bars for %s", ticker, exc_info=True)
+            continue
+        if ticker_bars.empty:
+            logger.warning("Fetched zero rows for %s, skipping", ticker)
+            continue
+        bars[ticker] = ticker_bars
+    return bars
+
+
+def stack_universe_bars(bars: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """
+    Reshape a {ticker: bars} dict, as returned by fetch_universe_bars,
+    into a single long-format DataFrame validated against PanelBarSchema:
+    one row per (timestamp, ticker) pair, indexed by a
+    (timestamp, ticker) MultiIndex.
+    """
+    stacked = pd.concat(bars, names=["ticker", "timestamp"])
+    stacked = stacked.swaplevel().sort_index()
+    return PanelBarSchema.validate(stacked)
 
 
 def _fetch_raw(ticker: str, start: str, end: str) -> pd.DataFrame:
