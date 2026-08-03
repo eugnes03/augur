@@ -1,12 +1,4 @@
-"""
-Defines the static research universe used by ingest and downstream
-feature/signal code.
-
-Intentionally simple: a single hardcoded list of yfinance-compatible
-ticker strings, with no point-in-time membership or survivorship-bias
-handling. See schemas.py and ingest.py for the project's general style —
-type-hinted, small, one concept per module.
-"""
+"""Static research universe used by ingest and downstream signal code."""
 
 from typing import Final
 
@@ -26,12 +18,8 @@ NORDIC_UNIVERSE: Final[list[str]] = [
 
 def get_universe() -> list[str]:
     """
-    Return the current research universe as a list of yfinance-compatible
-    ticker strings.
-
-    This is a static, hardcoded universe for now — no point-in-time
-    membership, no survivorship-bias handling. That's a deliberate
-    simplification (see project notes); revisit only if/when the
-    research shows it matters.
+    Return the research universe as yfinance-compatible ticker strings.
+    Static and hardcoded for now, deliberately -- no point-in-time
+    membership or survivorship-bias handling.
     """
     return NORDIC_UNIVERSE.copy()

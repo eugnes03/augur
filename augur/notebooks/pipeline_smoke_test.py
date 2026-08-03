@@ -6,11 +6,40 @@ app = marimo.App(width="full")
 
 @app.cell
 def _():
+    from dataclasses import dataclass
+
     import matplotlib.pyplot as plt
+    import pandas as pd
 
-    from augur import ingest, pnl, portfolio, returns, signals, universe
+    from augur import ingest, pnl, portfolio, returns, signals, stats, universe
 
-    return ingest, plt, pnl, portfolio, returns, signals, universe
+    @dataclass(frozen=True)
+    class BacktestConfig:
+        start: str
+        end: str
+        lookback: int
+        n_long: int
+        n_short: int
+
+    config = BacktestConfig(
+        start="2024-01-01",
+        end="2024-12-31",
+        lookback=20,
+        n_long=3,
+        n_short=3,
+    )
+    return (
+        config,
+        ingest,
+        pd,
+        plt,
+        pnl,
+        portfolio,
+        returns,
+        signals,
+        stats,
+        universe,
+    )
 
 
 @app.cell
@@ -20,27 +49,30 @@ def _(universe):
 
 
 @app.cell
-def _(ingest, tickers):
-    raw_bars = ingest.fetch_universe_bars(start="2024-01-01", end="2024-12-31", tickers=tickers)
+def _(config, ingest, tickers):
+    raw_bars = ingest.fetch_universe_bars(start=config.start, end=config.end, tickers=tickers)
     panel = ingest.stack_universe_bars(raw_bars)
     return (panel,)
 
 
 @app.cell
-def _(panel, signals):
-    momentum = signals.trailing_momentum(panel, lookback=20)
+def _(config, panel, signals):
+    momentum = signals.trailing_momentum(panel, lookback=config.lookback)
     return (momentum,)
 
 
 @app.cell
-def _(momentum, portfolio):
-    n_long, n_short = 3, 3
-    weights = momentum.unstack("ticker").apply(
-        lambda cross_section: portfolio.equal_weight(
-            cross_section.dropna(), n_long=n_long, n_short=n_short
-        ).reindex(cross_section.index, fill_value=0.0),
-        axis=1,
-    )
+def _(config, momentum, pd, portfolio):
+    def _daily_weights(cross_section: pd.Series) -> pd.Series:
+        available = cross_section.dropna()
+        if len(available) < config.n_long + config.n_short:
+            # Lookback warmup period: not enough tickers have momentum yet.
+            return pd.Series(0.0, index=cross_section.index)
+        return portfolio.equal_weight(
+            available, n_long=config.n_long, n_short=config.n_short
+        ).reindex(cross_section.index, fill_value=0.0)
+
+    weights = momentum.unstack("ticker").apply(_daily_weights, axis=1)
     return (weights,)
 
 
@@ -68,6 +100,26 @@ def _(daily_pnl, plt):
     ax.set_title("Cumulative log return: trailing-momentum long/short")
     ax.set_ylabel("Cumulative log return")
     fig
+    return
+
+
+@app.cell
+def _(daily_pnl, pd, stats):
+    performance_stats = pd.Series(
+        {
+            "total_return": stats.total_return(daily_pnl),
+            "annualized_return": stats.annualized_return(daily_pnl),
+            "annualized_volatility": stats.annualized_volatility(daily_pnl),
+            "sharpe_ratio": stats.sharpe_ratio(daily_pnl),
+            "max_drawdown": stats.max_drawdown(daily_pnl),
+        }
+    )
+    performance_stats
+    return
+
+
+@app.cell
+def _():
     return
 
 

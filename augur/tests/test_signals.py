@@ -33,3 +33,13 @@ def test_trailing_momentum_no_cross_ticker_leakage() -> None:
     for t, ea, eb in zip(timestamps, expected_a, expected_b, strict=True):
         np.testing.assert_allclose(result[(t, "A")], ea, equal_nan=True)
         np.testing.assert_allclose(result[(t, "B")], eb, equal_nan=True)
+
+
+def test_trailing_momentum_nan_when_lookback_exceeds_history() -> None:
+    """A lookback longer than the available history should be NaN, not raise or wrap."""
+    timestamps = pd.date_range("2024-01-01", periods=3, freq="D", tz="UTC", name="timestamp")
+    panel = _panel({"A": [100.0, 110.0, 121.0]}, timestamps)
+
+    result = trailing_momentum(panel, lookback=5)
+
+    assert result.isna().all()

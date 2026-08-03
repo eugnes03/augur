@@ -3,7 +3,7 @@ import pandera as pa
 from pandera.typing import Index, Series
 
 
-def _ohlc_consistent(df: pd.DataFrame) -> pd.Series:
+def ohlc_consistent(df: pd.DataFrame) -> pd.Series:
     """low must be the min and high must be the max of each bar."""
     return (
         (df["low"] <= df["open"])
@@ -16,12 +16,8 @@ def _ohlc_consistent(df: pd.DataFrame) -> pd.Series:
 
 class BarSchema(pa.DataFrameModel):
     """
-    Pandera schema for a single-ticker OHLCV bar DataFrame.
-
-    Shape:
-    - DatetimeIndex named 'timestamp', dtype datetime64[ns, UTC]
-    - columns: open, high, low, close, adj_close (float64), volume (int64)
-    - strict=True, coerce=False
+    Single-ticker OHLCV bars: DatetimeIndex 'timestamp' (UTC), columns
+    open/high/low/close/adj_close (float64) and volume (int64).
     """
 
     open: Series[float] = pa.Field(gt=0)
@@ -42,8 +38,8 @@ class BarSchema(pa.DataFrameModel):
         coerce = False
 
     @pa.dataframe_check
-    def ohlc_consistent(cls, df: pd.DataFrame) -> pd.Series:  # type: ignore[misc]  # noqa: N805
-        return _ohlc_consistent(df)
+    def ohlc_consistent_check(cls, df: pd.DataFrame) -> pd.Series:  # type: ignore[misc]  # noqa: N805
+        return ohlc_consistent(df)
 
     @pa.dataframe_check
     def index_sorted(cls, df: pd.DataFrame) -> bool:  # type: ignore[misc]  # noqa: N805
@@ -52,14 +48,9 @@ class BarSchema(pa.DataFrameModel):
 
 class PanelBarSchema(pa.DataFrameModel):
     """
-    Pandera schema for a multi-ticker OHLCV bar panel in long format, as
-    produced by ingest.stack_universe_bars.
-
-    Shape:
-    - MultiIndex (timestamp, ticker): timestamp is datetime64[ns, UTC],
-      ticker is a yfinance-compatible string; one row per pair
-    - columns: open, high, low, close, adj_close (float64), volume (int64)
-    - strict=True, coerce=False
+    Multi-ticker OHLCV bar panel, as produced by stack_universe_bars:
+    MultiIndex (timestamp, ticker), one row per pair, same OHLCV columns
+    as BarSchema.
     """
 
     open: Series[float] = pa.Field(gt=0)
@@ -81,8 +72,8 @@ class PanelBarSchema(pa.DataFrameModel):
         multiindex_unique = ["timestamp", "ticker"]
 
     @pa.dataframe_check
-    def ohlc_consistent(cls, df: pd.DataFrame) -> pd.Series:  # type: ignore[misc]  # noqa: N805
-        return _ohlc_consistent(df)
+    def ohlc_consistent_check(cls, df: pd.DataFrame) -> pd.Series:  # type: ignore[misc]  # noqa: N805
+        return ohlc_consistent(df)
 
     @pa.dataframe_check
     def timestamp_sorted(cls, df: pd.DataFrame) -> bool:  # type: ignore[misc]  # noqa: N805
