@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 
@@ -50,3 +51,11 @@ def rank_weight(momentum: pd.Series, n_long: int, n_short: int) -> pd.Series:
     weights[short_tickers] = -short_ranks / short_ranks.sum()
 
     return weights
+
+
+def apply_rebalance_frequency(weights: pd.DataFrame, frequency: int) -> pd.DataFrame:
+    """Recompute weights only every `frequency`-th row (by position), forward-filling in between."""
+    is_rebalance_day = np.arange(len(weights)) % frequency == 0
+    held_weights = weights.copy()
+    held_weights.loc[~is_rebalance_day] = np.nan
+    return held_weights.ffill()
