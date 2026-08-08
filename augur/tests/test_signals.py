@@ -75,7 +75,39 @@ def test_combine_signals_averages_cross_sectional_zscores() -> None:
     signal_a = pd.Series([1.0, 2.0, 3.0], index=index)
     signal_b = pd.Series([10.0, 10.0, 40.0], index=index)
 
-    result = combine_signals([signal_a, signal_b])
+    result = combine_signals({"a": signal_a, "b": signal_b})
 
     expected = pd.Series([-0.78868, -0.28868, 1.07735], index=index)
+    np.testing.assert_allclose(result.to_numpy(), expected.to_numpy(), rtol=1e-4)
+
+
+def test_combine_signals_large_raw_scale_does_not_dominate() -> None:
+    """Z-scoring first means rescaling one signal's raw magnitude doesn't change the combination."""
+    timestamp = pd.Timestamp("2024-01-01", tz="UTC")
+    index = pd.MultiIndex.from_tuples(
+        [(timestamp, "A"), (timestamp, "B"), (timestamp, "C")],
+        names=["timestamp", "ticker"],
+    )
+    signal_a = pd.Series([1.0, 2.0, 3.0], index=index)
+    signal_b = pd.Series([10.0, 10.0, 40.0], index=index)
+
+    result_natural_scale = combine_signals({"a": signal_a, "b": signal_b})
+    result_10x_scale = combine_signals({"a": signal_a, "b": signal_b * 10.0})
+
+    np.testing.assert_allclose(result_natural_scale.to_numpy(), result_10x_scale.to_numpy())
+
+
+def test_combine_signals_respects_explicit_weights() -> None:
+    """Weighting one signal at 1.0 and the other at 0.0 reduces to that signal's z-score alone."""
+    timestamp = pd.Timestamp("2024-01-01", tz="UTC")
+    index = pd.MultiIndex.from_tuples(
+        [(timestamp, "A"), (timestamp, "B"), (timestamp, "C")],
+        names=["timestamp", "ticker"],
+    )
+    signal_a = pd.Series([1.0, 2.0, 3.0], index=index)
+    signal_b = pd.Series([10.0, 10.0, 40.0], index=index)
+
+    result = combine_signals({"a": signal_a, "b": signal_b}, weights={"a": 1.0, "b": 0.0})
+
+    expected = pd.Series([-1.0, 0.0, 1.0], index=index)
     np.testing.assert_allclose(result.to_numpy(), expected.to_numpy(), rtol=1e-4)

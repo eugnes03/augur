@@ -34,3 +34,21 @@ def max_drawdown(returns: pd.Series) -> float:
     """Largest peak-to-trough decline in cumulative wealth from `returns` (a negative fraction)."""
     wealth = np.exp(returns.cumsum())
     return float((wealth / wealth.cummax() - 1.0).min())
+
+
+def turnover(weights: pd.DataFrame) -> pd.Series:
+    """One-way turnover per date: half the gross change in weights since the prior date."""
+    result: pd.Series = 0.5 * weights.diff().abs().sum(axis=1)
+    return result
+
+
+def gross_exposure(weights: pd.DataFrame) -> pd.Series:
+    """Sum of absolute position weights per date; ~2 for a fully-invested dollar-neutral book."""
+    result: pd.Series = weights.abs().sum(axis=1)
+    return result
+
+
+def net_exposure(weights: pd.DataFrame) -> pd.Series:
+    """Sum of signed position weights per date; ~0 for a dollar-neutral book."""
+    result: pd.Series = weights.sum(axis=1)
+    return result

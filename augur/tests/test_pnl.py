@@ -2,6 +2,8 @@
 
 import numpy as np
 import pandas as pd
+from hypothesis import given
+from hypothesis import strategies as st
 
 from augur.pnl import strategy_returns
 
@@ -33,6 +35,19 @@ def test_strategy_returns_nan_return_on_held_ticker_makes_date_nan() -> None:
     result = strategy_returns(weights, forward_returns)
 
     assert result.isna().all()
+
+
+@given(st.lists(st.floats(allow_nan=True, allow_infinity=False, width=32), min_size=1, max_size=5))
+def test_strategy_returns_is_zero_when_all_weights_are_zero(row: list[float]) -> None:
+    """A date with all-zero weights has exactly zero strategy return, regardless of returns."""
+    dates = pd.date_range("2024-01-01", periods=1, freq="D", tz="UTC", name="timestamp")
+    columns = [f"ticker_{i}" for i in range(len(row))]
+    weights = pd.DataFrame([[0.0] * len(row)], index=dates, columns=columns)
+    forward_returns = pd.DataFrame([row], index=dates, columns=columns)
+
+    result = strategy_returns(weights, forward_returns)
+
+    assert result.iloc[0] == 0.0
 
 
 def test_strategy_returns_nan_return_on_unheld_ticker_is_ignored() -> None:

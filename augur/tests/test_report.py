@@ -11,12 +11,21 @@ def test_write_report_creates_markdown_and_png(tmp_path: Path) -> None:
     """write_report produces a markdown file with the stats table and a non-empty sibling PNG."""
     dates = pd.date_range("2024-01-01", periods=5, freq="D", tz="UTC", name="timestamp")
     returns = pd.Series([0.01, -0.02, 0.03, 0.0, 0.01], index=dates)
+    weights = pd.DataFrame({"A": [0.5] * 5, "B": [-0.5] * 5}, index=dates)
     report_path = tmp_path / "report.md"
 
-    write_report(returns, report_path)
+    write_report(returns, weights, report_path)
 
     content = report_path.read_text()
-    for stat_name in ["total_return", "annualized_return", "sharpe_ratio", "max_drawdown"]:
+    for stat_name in [
+        "total_return",
+        "annualized_return",
+        "sharpe_ratio",
+        "max_drawdown",
+        "avg_turnover_per_rebalance",
+        "avg_gross_exposure",
+        "avg_net_exposure",
+    ]:
         assert stat_name in content
 
     png_path = report_path.with_suffix(".png")

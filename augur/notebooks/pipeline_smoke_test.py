@@ -10,9 +10,10 @@ def _():
     import pandas as pd
 
     from augur import stats
-    from augur.backtest import BacktestConfig, run_backtest
+    from augur.backtest import run_backtest
+    from augur.config import Config
 
-    config = BacktestConfig(
+    config = Config(
         start="2024-01-01",
         end="2024-12-31",
         momentum_lookback=20,
@@ -20,12 +21,12 @@ def _():
         n_long=3,
         n_short=3,
     )
-    return BacktestConfig, config, pd, plt, run_backtest, stats
+    return Config, config, pd, plt, run_backtest, stats
 
 
 @app.cell
 def _(config, run_backtest):
-    daily_pnl = run_backtest(config)
+    daily_pnl = run_backtest(config).returns
     return (daily_pnl,)
 
 
@@ -56,13 +57,13 @@ def _(daily_pnl, pd, stats):
 
 
 @app.cell
-def _(BacktestConfig, config, run_backtest):
+def _(Config, config, run_backtest):
     # Naive chronological split, not a parameter-selection tool.
-    in_sample_config = BacktestConfig(**{**config.__dict__, "start": "2024-01-01", "end": "2024-08-31"})
-    out_of_sample_config = BacktestConfig(**{**config.__dict__, "start": "2024-09-01", "end": "2024-12-31"})
+    in_sample_config = Config(**{**config.__dict__, "start": "2024-01-01", "end": "2024-08-31"})
+    out_of_sample_config = Config(**{**config.__dict__, "start": "2024-09-01", "end": "2024-12-31"})
 
-    in_sample_pnl = run_backtest(in_sample_config)
-    out_of_sample_pnl = run_backtest(out_of_sample_config)
+    in_sample_pnl = run_backtest(in_sample_config).returns
+    out_of_sample_pnl = run_backtest(out_of_sample_config).returns
     return in_sample_pnl, out_of_sample_pnl
 
 

@@ -127,3 +127,20 @@ def test_equal_weight_is_always_dollar_neutral_and_fully_invested(
 
     assert weights.sum() == pytest.approx(0.0, abs=1e-9)
     assert weights.abs().sum() == pytest.approx(2.0, abs=1e-9)
+
+
+@given(_momentum_and_selection())
+def test_rank_weight_is_monotonic_in_rank_within_each_side(
+    momentum_and_selection: tuple[pd.Series, int, int],
+) -> None:
+    """Higher momentum gives a larger long weight; lower momentum gives a larger short weight."""
+    momentum, n_long, n_short = momentum_and_selection
+
+    weights = rank_weight(momentum, n_long=n_long, n_short=n_short)
+
+    ranked = momentum.sort_values(ascending=False, kind="stable")
+    long_weights = weights[ranked.index[:n_long]]
+    short_weights = weights[ranked.index[-n_short:]]
+
+    assert long_weights.is_monotonic_decreasing
+    assert short_weights.abs().is_monotonic_increasing

@@ -3,44 +3,42 @@ from dataclasses import dataclass
 import pandas as pd
 
 from augur import ingest, pnl, portfolio, returns, signals, universe
+from augur.config import Config
 
 
 @dataclass(frozen=True)
-class BacktestConfig:
-    start: str
-    end: str
-    momentum_lookback: int
-    reversal_lookback: int
-    n_long: int
-    n_short: int
-    rebalance_frequency: int = 1
+class BacktestResult:
+    """Daily strategy pnl alongside the portfolio weights that produced it."""
+
+    returns: pd.Series
+    weights: pd.DataFrame
 
 
-def run_backtest(config: BacktestConfig) -> pd.Series:
-    """Run the full momentum+reversal long/short pipeline for `config`, returning daily pnl."""
+def run_backtest(config: Config) -> BacktestResult:
+    """Run the full momentum+reversal long/short pipeline for `config`."""
     panel = _load_panel(config)
     combined_signal = _combined_signal(panel, config)
     weights = _daily_weights(combined_signal, config)
     weights = portfolio.apply_rebalance_frequency(weights, config.rebalance_frequency)
     forward_returns = _forward_returns(panel)
     aligned_weights = weights.shift(1).reindex(forward_returns.index)
-    return pnl.strategy_returns(aligned_weights, forward_returns).dropna()
+    daily_returns = pnl.strategy_returns(aligned_weights, forward_returns).dropna()
+    return BacktestResult(returns=daily_returns, weights=weights)
 
 
-def _load_panel(config: BacktestConfig) -> pd.DataFrame:
-    raw_bars = ingest.fetch_universe_bars(
-        start=config.start, end=config.end, tickers=universe.get_universe()
-    )
+def _load_panel(config: Config) -> pd.DataFrame:
+    tickers = config.universe if config.universe is not None else universe.get_universe()
+    raw_bars = ingest.fetch_universe_bars(start=config.start, end=config.end, tickers=tickers)
     return ingest.stack_universe_bars(raw_bars)
 
 
-def _combined_signal(panel: pd.DataFrame, config: BacktestConfig) -> pd.Series:
+def _combined_signal(panel: pd.DataFrame, config: Config) -> pd.Series:
     momentum = signals.trailing_momentum(panel, lookback=config.momentum_lookback)
     reversal = signals.short_term_reversal(panel, lookback=config.reversal_lookback)
-    return signals.combine_signals([momentum, reversal])
+    return signals.combine_signals({"momentum": momentum, "reversal": reversal})
 
 
-def _daily_weights(combined_signal: pd.Series, config: BacktestConfig) -> pd.DataFrame:
+def _daily_weights(combined_signal: pd.Series, config: Config) -> pd.DataFrame:
     def cross_section_weights(cross_section: pd.Series) -> pd.Series:
         available = cross_section.dropna()
         if len(available) < config.n_long + config.n_short:

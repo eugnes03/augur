@@ -7,9 +7,12 @@ import pytest
 from augur.stats import (
     annualized_return,
     annualized_volatility,
+    gross_exposure,
     max_drawdown,
+    net_exposure,
     sharpe_ratio,
     total_return,
+    turnover,
 )
 
 
@@ -48,3 +51,35 @@ def test_max_drawdown_monotonic_gains_is_zero() -> None:
     """A series that only ever rises has no drawdown."""
     returns = pd.Series([np.log(1.05), np.log(1.02), np.log(1.01)])
     assert max_drawdown(returns) == pytest.approx(0.0)
+
+
+def _weights() -> pd.DataFrame:
+    dates = pd.date_range("2024-01-01", periods=3, freq="D", tz="UTC", name="timestamp")
+    return pd.DataFrame(
+        {"A": [0.5, 0.5, 1.0], "B": [-0.5, -0.5, 0.0], "C": [0.0, 0.0, -1.0]},
+        index=dates,
+    )
+
+
+def test_turnover_hand_computed() -> None:
+    """Turnover is half the gross weight change; a date with no weight change is zero."""
+    result = turnover(_weights())
+
+    assert result.iloc[1] == pytest.approx(0.0)
+    assert result.iloc[2] == pytest.approx(0.5 * (0.5 + 0.5 + 1.0))
+
+
+def test_gross_exposure_hand_computed() -> None:
+    """Gross exposure is the sum of absolute weights per date."""
+    result = gross_exposure(_weights())
+
+    expected = pd.Series([1.0, 1.0, 2.0], index=_weights().index)
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_net_exposure_hand_computed() -> None:
+    """Net exposure is the sum of signed weights per date."""
+    result = net_exposure(_weights())
+
+    expected = pd.Series([0.0, 0.0, 0.0], index=_weights().index)
+    pd.testing.assert_series_equal(result, expected)

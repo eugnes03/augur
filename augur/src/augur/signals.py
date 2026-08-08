@@ -14,10 +14,19 @@ def short_term_reversal(panel: pd.DataFrame, lookback: int) -> pd.Series:
     return -trailing_momentum(panel, lookback)
 
 
-def combine_signals(signals: list[pd.Series]) -> pd.Series:
-    """Reduce multiple aligned signals to one by averaging their cross-sectional z-scores."""
-    zscored = [_cross_sectional_zscore(signal) for signal in signals]
-    combined: pd.Series = pd.concat(zscored, axis=1).mean(axis=1)
+def combine_signals(
+    signals: dict[str, pd.Series], weights: dict[str, float] | None = None
+) -> pd.Series:
+    """
+    Reduce multiple aligned signals to one weighted sum of their cross-sectional
+    z-scores. Z-scoring first keeps a signal's raw scale from dominating the
+    combination. Defaults to equal weighting across signals.
+    """
+    weights = weights if weights is not None else dict.fromkeys(signals, 1.0 / len(signals))
+    zscored = {
+        name: _cross_sectional_zscore(signal) * weights[name] for name, signal in signals.items()
+    }
+    combined: pd.Series = pd.concat(zscored, axis=1).sum(axis=1)
     return combined
 
 
