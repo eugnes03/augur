@@ -1,0 +1,17 @@
+name: check
+
+on: push
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: augur
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv sync
+      - run: uv run ruff check .
+      - run: uv run mypy --strict src tests scripts
+      - run: uv run pytest
