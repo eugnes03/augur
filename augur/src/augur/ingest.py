@@ -21,6 +21,8 @@ _COLUMN_RENAME = {
     "Close": "close",
     "Adj Close": "adj_close",
     "Volume": "volume",
+    "Stock Splits": "stock_splits",
+    "Dividends": "dividends"
 }
 
 
@@ -77,7 +79,7 @@ def _fetch_raw(
     if cache_path.exists():
         return pd.DataFrame(pd.read_parquet(cache_path))
 
-    raw = pd.DataFrame(yf.download(ticker, start=start, end=end, auto_adjust=False))
+    raw = pd.DataFrame(yf.download(ticker, start=start, end=end, auto_adjust=False, actions=True))
     cache_dir.mkdir(parents=True, exist_ok=True)
     raw.to_parquet(cache_path)
     return raw

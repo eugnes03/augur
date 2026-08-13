@@ -20,6 +20,8 @@ def valid_bars() -> pd.DataFrame:
             "close": [101.0, 102.0],
             "adj_close": [101.0, 102.0],
             "volume": [1_000, 1_500],
+            "stock_splits": [0.0, 0.0],
+            "dividends": [0.25, 0],
         },
         index=index,
     )

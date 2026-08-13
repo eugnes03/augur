@@ -26,6 +26,8 @@ class BarSchema(pa.DataFrameModel):
     close: Series[float] = pa.Field(gt=0)
     adj_close: Series[float] = pa.Field(gt=0)
     volume: Series[int] = pa.Field(ge=0)
+    stock_splits: Series[float] = pa.Field(ge=0)
+    dividends: Series[float] = pa.Field(ge=0)
 
     timestamp: Index[pd.DatetimeTZDtype] = pa.Field(
         dtype_kwargs={"unit": "ns", "tz": "UTC"},
