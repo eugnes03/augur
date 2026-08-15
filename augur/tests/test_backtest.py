@@ -29,6 +29,8 @@ def _make_bars(daily_log_returns: list[float], start: str) -> pd.DataFrame:
             "close": price,
             "adj_close": price,
             "volume": 1_000,
+            "stock_splits": 0.0,
+            "dividends": 0.0,
         },
         index=index,
     )
@@ -40,6 +42,8 @@ def _make_bars(daily_log_returns: list[float], start: str) -> pd.DataFrame:
             "close": "float64",
             "adj_close": "float64",
             "volume": "int64",
+            "stock_splits": "float64",
+            "dividends": "float64",
         }
     )
 

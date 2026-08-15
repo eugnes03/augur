@@ -3,10 +3,11 @@ from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
-from augur import stats
-from augur.backtest import run_backtest
+from augur import report, stats
+from augur.backtest import BacktestResult, run_backtest
 from augur.config import Config
 
 _REPORTS_DIR = Path(__file__).resolve().parents[1] / "reports"
@@ -26,9 +27,17 @@ _base_config = Config(
 )
 
 
-def _grid_row(config: Config) -> dict[str, float]:
-    """Run one grid point in-sample and summarize Sharpe/turnover/drawdown."""
-    result = run_backtest(config)
+def _configs() -> list[Config]:
+    """Every (lookback, selection size) grid point: this run's actual trial count."""
+    return [
+        replace(_base_config, momentum_lookback=lookback, n_long=n, n_short=n)
+        for lookback in _LOOKBACKS
+        for n in _SELECTION_SIZES
+    ]
+
+
+def _grid_row(config: Config, result: BacktestResult) -> dict[str, float]:
+    """Summarize one already-run grid point's Sharpe/turnover/drawdown."""
     return {
         "lookback": config.momentum_lookback,
         "n_long_short": config.n_long,
@@ -38,14 +47,17 @@ def _grid_row(config: Config) -> dict[str, float]:
     }
 
 
-def run_sweep() -> pd.DataFrame:
-    """Tabulate Sharpe/turnover/max-drawdown across a lookback x selection-size grid, in-sample."""
-    rows = [
-        _grid_row(replace(_base_config, momentum_lookback=lookback, n_long=n, n_short=n))
-        for lookback in _LOOKBACKS
-        for n in _SELECTION_SIZES
-    ]
-    return pd.DataFrame(rows)
+def run_sweep() -> tuple[pd.DataFrame, list[BacktestResult]]:
+    """
+    Run every grid point in-sample once, returning both the summary table and each
+    point's raw BacktestResult (the latter feeds the best config's deflated Sharpe).
+    """
+    configs = _configs()
+    results = [run_backtest(config) for config in configs]
+    grid = pd.DataFrame(
+        _grid_row(config, result) for config, result in zip(configs, results, strict=True)
+    )
+    return grid, results
 
 
 def _render_markdown(grid: pd.DataFrame) -> str:
@@ -58,12 +70,31 @@ def _render_markdown(grid: pd.DataFrame) -> str:
     return f"# Parameter sensitivity sweep (in-sample only)\n\n{header}\n{separator}\n{rows}\n"
 
 
+def _period_sharpe_ratios(results: list[BacktestResult]) -> np.ndarray:
+    """
+    Per-period (non-annualized) Sharpe of each grid point's returns: the units
+    deflated_sharpe_ratio() and its inputs are defined in, unlike the annualized
+    "sharpe_ratio" column in the sensitivity table above.
+    """
+    return np.array([result.returns.mean() / result.returns.std() for result in results])
+
+
 def main() -> None:
     logging.basicConfig(level=logging.WARNING)
-    grid = run_sweep()
+    grid, results = run_sweep()
     path = _REPORTS_DIR / f"{date.today()}-param-sweep.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(_render_markdown(grid))
+
+    best = int(grid["sharpe_ratio"].idxmax())
+    best_result = results[best]
+    trial_sharpe_ratios = _period_sharpe_ratios(results)
+    report.write_report(
+        best_result.returns,
+        best_result.weights,
+        _REPORTS_DIR / f"{date.today()}-param-sweep-best.md",
+        trial_sharpe_ratios,
+    )
 
 
 if __name__ == "__main__":
