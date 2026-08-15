@@ -26,6 +26,16 @@ def run_backtest(config: Config) -> BacktestResult:
     return BacktestResult(returns=daily_returns, weights=weights)
 
 
+def benchmark_returns(config: Config, ticker: str = universe.BENCHMARK_TICKER) -> pd.Series:
+    """
+    Forward daily log return of `ticker` (default: the NASDAQ-100 index), using the same
+    (t, t+1] indexing as run_backtest()'s returns so the two align for alpha/beta regression.
+    """
+    bars = ingest.fetch_bars(ticker, config.start, config.end)
+    result: pd.Series = returns.log_return(bars["adj_close"], periods=1).shift(-1).dropna()
+    return result
+
+
 def _load_panel(config: Config) -> pd.DataFrame:
     tickers = config.universe if config.universe is not None else universe.get_universe()
     raw_bars = ingest.fetch_universe_bars(start=config.start, end=config.end, tickers=tickers)

@@ -137,6 +137,28 @@ def test_run_backtest_uses_next_day_return_not_same_day(
     assert same_day_returns[target_date] == pytest.approx(-0.05)
 
 
+def test_benchmark_returns_uses_forward_shifted_log_returns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """benchmark_returns must use the same (t, t+1] forward shift as run_backtest()'s returns."""
+    index_returns = [0.0, 0.10, -0.20, 0.05]
+    bars = _make_bars(index_returns, "2024-01-02")
+    monkeypatch.setattr(ingest, "fetch_bars", lambda *_args, **_kwargs: bars)
+    config = Config(
+        start="2024-01-02",
+        end="2024-01-10",
+        momentum_lookback=1,
+        reversal_lookback=1,
+        n_long=1,
+        n_short=1,
+    )
+
+    result = backtest.benchmark_returns(config, ticker="^NDX")
+
+    expected = pd.Series(index_returns[1:], index=_session_close_index("2024-01-02", 3))
+    pd.testing.assert_series_equal(result, expected, check_names=False)
+
+
 def test_daily_weights_returns_zero_row_when_below_warmup_threshold() -> None:
     """
     A date where fewer tickers have a signal than n_long + n_short requires can't be split

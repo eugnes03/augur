@@ -5,8 +5,10 @@ import pandas as pd
 import pytest
 
 from augur.stats import (
+    alpha,
     annualized_return,
     annualized_volatility,
+    beta,
     deflated_sharpe_ratio,
     expected_max_sharpe_ratio,
     gross_exposure,
@@ -118,6 +120,38 @@ def test_random_trial_sharpe_ratios_weights_are_dollar_neutral() -> None:
 
     np.testing.assert_allclose(weights.sum(axis=1), 0.0, atol=1e-10)
     np.testing.assert_allclose(np.abs(weights).sum(axis=1), 1.0, atol=1e-10)
+
+
+def _capm_series() -> tuple[pd.Series, pd.Series]:
+    """Returns built as exactly 0.001 + 1.5*benchmark (zero noise): beta=1.5, alpha_period=0.001."""
+    benchmark_returns = pd.Series([0.01, -0.02, 0.03, 0.0, 0.015])
+    returns = 0.001 + 1.5 * benchmark_returns
+    return returns, benchmark_returns
+
+
+def test_beta_hand_computed_zero_noise() -> None:
+    """A returns series built as an exact linear function of the benchmark recovers its slope."""
+    returns, benchmark_returns = _capm_series()
+    assert beta(returns, benchmark_returns) == pytest.approx(1.5)
+
+
+def test_alpha_hand_computed_zero_noise() -> None:
+    """Same zero-noise series recovers its per-period intercept, annualized by periods_per_year."""
+    returns, benchmark_returns = _capm_series()
+    assert alpha(returns, benchmark_returns, periods_per_year=1) == pytest.approx(0.001)
+    assert alpha(returns, benchmark_returns, periods_per_year=252) == pytest.approx(0.001 * 252)
+
+
+def test_beta_aligns_on_mismatched_index() -> None:
+    """Dates present in only one series should be dropped before regressing, not raise."""
+    returns, benchmark_returns = _capm_series()
+    returns_missing_first = returns.iloc[1:]
+    benchmark_missing_last = benchmark_returns.iloc[:-1]
+    overlap_labels = returns_missing_first.index.intersection(benchmark_missing_last.index)
+
+    assert beta(returns_missing_first, benchmark_missing_last) == pytest.approx(
+        beta(returns.loc[overlap_labels], benchmark_returns.loc[overlap_labels])
+    )
 
 
 def _weights() -> pd.DataFrame:
