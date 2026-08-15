@@ -13,18 +13,21 @@ def write_report(
     path: Path,
     trial_sharpe_ratios: np.ndarray | None = None,
     benchmark_returns: pd.Series | None = None,
+    net_returns: pd.Series | None = None,
 ) -> None:
     """
     Write a markdown stats table and a cumulative-return PNG for `returns` to `path`.
     Pass `trial_sharpe_ratios`, the per-period Sharpe of every grid point in a real
     parameter sweep, to also report the deflated Sharpe ratio against that sweep.
     Pass `benchmark_returns` to also report alpha/beta against that benchmark.
+    Pass `net_returns` (e.g. costs.net_of_costs(returns, weights, ...)) to also report
+    returns after transaction costs, alongside the gross numbers above.
     """
     png_path = path.with_suffix(".png")
     _save_cumulative_return_plot(returns, png_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     markdown = _render_markdown(
-        returns, weights, png_path.name, trial_sharpe_ratios, benchmark_returns
+        returns, weights, png_path.name, trial_sharpe_ratios, benchmark_returns, net_returns
     )
     path.write_text(markdown)
 
@@ -55,12 +58,22 @@ def _regression_stats(returns: pd.Series, benchmark_returns: pd.Series) -> dict[
     }
 
 
+def _cost_stats(net_returns: pd.Series) -> dict[str, float]:
+    """Same headline stats as the gross block above, computed net of transaction costs."""
+    return {
+        "net_total_return": stats.total_return(net_returns),
+        "net_annualized_return": stats.annualized_return(net_returns),
+        "net_sharpe_ratio": stats.sharpe_ratio(net_returns),
+    }
+
+
 def _render_markdown(
     returns: pd.Series,
     weights: pd.DataFrame,
     png_name: str,
     trial_sharpe_ratios: np.ndarray | None,
     benchmark_returns: pd.Series | None,
+    net_returns: pd.Series | None,
 ) -> str:
     performance_stats = {
         "total_return": stats.total_return(returns),
@@ -76,6 +89,8 @@ def _render_markdown(
         performance_stats.update(_deflation_stats(returns, trial_sharpe_ratios))
     if benchmark_returns is not None:
         performance_stats.update(_regression_stats(returns, benchmark_returns))
+    if net_returns is not None:
+        performance_stats.update(_cost_stats(net_returns))
     rows = "\n".join(f"| {name} | {value:.4f} |" for name, value in performance_stats.items())
     return (
         "# Backtest report\n\n"

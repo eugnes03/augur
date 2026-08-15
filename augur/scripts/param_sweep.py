@@ -9,6 +9,7 @@ import pandas as pd
 from augur import report, stats
 from augur.backtest import BacktestResult, benchmark_returns, run_backtest
 from augur.config import Config
+from augur.costs import net_of_costs
 
 _REPORTS_DIR = Path(__file__).resolve().parents[1] / "reports"
 
@@ -90,12 +91,16 @@ def main() -> None:
     best_result = results[best]
     best_config = _configs()[best]
     trial_sharpe_ratios = _period_sharpe_ratios(results)
+    net_returns = net_of_costs(
+        best_result.returns, best_result.weights, best_config.transaction_cost_bps
+    )
     report.write_report(
         best_result.returns,
         best_result.weights,
         _REPORTS_DIR / f"{date.today()}-param-sweep-best.md",
         trial_sharpe_ratios,
         benchmark_returns=benchmark_returns(best_config),
+        net_returns=net_returns,
     )
 
 
