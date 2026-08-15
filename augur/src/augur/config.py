@@ -13,3 +13,7 @@ class Config:
     n_short: int
     rebalance_frequency: int = 1
     universe: list[str] | None = None
+    # 10 bps one-way: a conservative literature rule-of-thumb for liquid US large-caps
+    # (spread + slippage), not measured from this project's own data. Revisit with a
+    # data-derived estimate (e.g. a high-low spread proxy) if costs end up load-bearing.
+    transaction_cost_bps: float = 10.0

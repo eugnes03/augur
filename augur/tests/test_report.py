@@ -90,3 +90,31 @@ def test_write_report_omits_regression_stats_by_default(tmp_path: Path) -> None:
 
     content = report_path.read_text()
     assert "beta" not in content
+
+
+def test_write_report_includes_cost_stats_when_net_returns_given(tmp_path: Path) -> None:
+    """Passing net_returns should add the net_* rows alongside the gross ones."""
+    dates = pd.date_range("2024-01-01", periods=5, freq="D", tz="UTC", name="timestamp")
+    returns = pd.Series([0.01, -0.02, 0.03, 0.0, 0.01], index=dates)
+    weights = pd.DataFrame({"A": [0.5] * 5, "B": [-0.5] * 5}, index=dates)
+    net_returns = returns - 0.001
+    report_path = tmp_path / "report.md"
+
+    write_report(returns, weights, report_path, net_returns=net_returns)
+
+    content = report_path.read_text()
+    for stat_name in ["net_total_return", "net_annualized_return", "net_sharpe_ratio"]:
+        assert stat_name in content
+
+
+def test_write_report_omits_cost_stats_by_default(tmp_path: Path) -> None:
+    """Without net_returns, the net_* rows should not appear."""
+    dates = pd.date_range("2024-01-01", periods=5, freq="D", tz="UTC", name="timestamp")
+    returns = pd.Series([0.01, -0.02, 0.03, 0.0, 0.01], index=dates)
+    weights = pd.DataFrame({"A": [0.5] * 5, "B": [-0.5] * 5}, index=dates)
+    report_path = tmp_path / "report.md"
+
+    write_report(returns, weights, report_path)
+
+    content = report_path.read_text()
+    assert "net_sharpe_ratio" not in content
