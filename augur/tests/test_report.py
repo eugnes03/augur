@@ -62,3 +62,31 @@ def test_write_report_omits_deflation_stats_by_default(tmp_path: Path) -> None:
 
     content = report_path.read_text()
     assert "deflated_sharpe_ratio" not in content
+
+
+def test_write_report_includes_regression_stats_when_benchmark_given(tmp_path: Path) -> None:
+    """Passing benchmark_returns should add beta/alpha_annualized rows to the table."""
+    dates = pd.date_range("2024-01-01", periods=5, freq="D", tz="UTC", name="timestamp")
+    returns = pd.Series([0.01, -0.02, 0.03, 0.0, 0.01], index=dates)
+    weights = pd.DataFrame({"A": [0.5] * 5, "B": [-0.5] * 5}, index=dates)
+    benchmark_returns = pd.Series([0.005, -0.01, 0.02, 0.001, 0.008], index=dates)
+    report_path = tmp_path / "report.md"
+
+    write_report(returns, weights, report_path, benchmark_returns=benchmark_returns)
+
+    content = report_path.read_text()
+    for stat_name in ["beta", "alpha_annualized"]:
+        assert stat_name in content
+
+
+def test_write_report_omits_regression_stats_by_default(tmp_path: Path) -> None:
+    """Without benchmark_returns, the beta/alpha rows should not appear."""
+    dates = pd.date_range("2024-01-01", periods=5, freq="D", tz="UTC", name="timestamp")
+    returns = pd.Series([0.01, -0.02, 0.03, 0.0, 0.01], index=dates)
+    weights = pd.DataFrame({"A": [0.5] * 5, "B": [-0.5] * 5}, index=dates)
+    report_path = tmp_path / "report.md"
+
+    write_report(returns, weights, report_path)
+
+    content = report_path.read_text()
+    assert "beta" not in content

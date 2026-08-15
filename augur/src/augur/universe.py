@@ -21,6 +21,10 @@ _NASDAQ_100_WIKI_URL: Final[str] = "https://en.wikipedia.org/wiki/List_of_NASDAQ
 # Wikipedia 403s the default urllib user agent
 _WIKI_STORAGE_OPTIONS: Final[dict[str, str]] = {"User-Agent": "augur-research/0.1"}
 
+# NASDAQ-100 index, yfinance-compatible: the alpha/beta regression benchmark for
+# get_universe()'s NASDAQ-100 constituents.
+BENCHMARK_TICKER: Final[str] = "^NDX"
+
 
 def _fetch_nasdaq_100_tickers() -> list[str]:
     """Scrape current NASDAQ-100 constituent tickers from Wikipedia's constituents table."""
@@ -32,8 +36,8 @@ def _fetch_nasdaq_100_tickers() -> list[str]:
 def get_universe() -> list[str]:
     """
     Return the research universe as yfinance-compatible ticker strings.
-    Nordic large caps are static, NASDAQ-100 constituents are scraped live
-    from Wikipedia. No point-in-time membership or survivorship-bias
-    handling for either leg yet.
+    NASDAQ-100 constituents only for now, scraped live from Wikipedia
+    (NORDIC_UNIVERSE is parked, not mixed in). No point-in-time membership
+    or survivorship-bias handling yet.
     """
-    return NORDIC_UNIVERSE + _fetch_nasdaq_100_tickers()
+    return list(_fetch_nasdaq_100_tickers())

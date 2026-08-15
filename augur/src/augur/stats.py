@@ -92,6 +92,28 @@ def deflated_sharpe_ratio(returns: pd.Series, trial_sharpe_ratios: np.ndarray) -
     return probabilistic_sharpe_ratio(returns, benchmark_sharpe)
 
 
+def beta(returns: pd.Series, benchmark_returns: pd.Series) -> float:
+    """OLS beta of `returns` on `benchmark_returns`: cov(returns, benchmark) / var(benchmark)."""
+    aligned_returns, aligned_benchmark = returns.align(benchmark_returns, join="inner")
+    covariance = aligned_returns.cov(aligned_benchmark)
+    variance = aligned_benchmark.var()
+    return float(covariance / variance)
+
+
+def alpha(
+    returns: pd.Series,
+    benchmark_returns: pd.Series,
+    periods_per_year: int = TRADING_DAYS_PER_YEAR,
+) -> float:
+    """
+    Annualized OLS alpha: r = alpha_period + beta*r_benchmark + e, alpha_period*periods_per_year.
+    """
+    aligned_returns, aligned_benchmark = returns.align(benchmark_returns, join="inner")
+    strategy_beta = beta(returns, benchmark_returns)
+    period_alpha = aligned_returns.mean() - strategy_beta * aligned_benchmark.mean()
+    return float(period_alpha * periods_per_year)
+
+
 def max_drawdown(returns: pd.Series) -> float:
     """Largest peak-to-trough decline in cumulative wealth from `returns` (a negative fraction)."""
     wealth = np.exp(returns.cumsum())

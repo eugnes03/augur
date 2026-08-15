@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from augur import report, stats
-from augur.backtest import BacktestResult, run_backtest
+from augur.backtest import BacktestResult, benchmark_returns, run_backtest
 from augur.config import Config
 
 _REPORTS_DIR = Path(__file__).resolve().parents[1] / "reports"
@@ -88,12 +88,14 @@ def main() -> None:
 
     best = int(grid["sharpe_ratio"].idxmax())
     best_result = results[best]
+    best_config = _configs()[best]
     trial_sharpe_ratios = _period_sharpe_ratios(results)
     report.write_report(
         best_result.returns,
         best_result.weights,
         _REPORTS_DIR / f"{date.today()}-param-sweep-best.md",
         trial_sharpe_ratios,
+        benchmark_returns=benchmark_returns(best_config),
     )
 
 
