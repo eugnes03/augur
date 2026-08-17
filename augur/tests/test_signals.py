@@ -2,8 +2,14 @@
 
 import numpy as np
 import pandas as pd
+import pytest
 
-from augur.signals import combine_signals, short_term_reversal, trailing_momentum
+from augur.signals import (
+    combine_signals,
+    short_term_reversal,
+    trailing_momentum,
+    trailing_volatility,
+)
 
 
 def _panel(prices: dict[str, list[float]], timestamps: pd.DatetimeIndex) -> pd.DataFrame:
@@ -63,6 +69,35 @@ def test_short_term_reversal_correct_sign() -> None:
     for t, ea, eb in zip(timestamps, expected_a, expected_b, strict=True):
         np.testing.assert_allclose(result[(t, "A")], ea, equal_nan=True)
         np.testing.assert_allclose(result[(t, "B")], eb, equal_nan=True)
+
+
+def test_trailing_volatility_no_cross_ticker_leakage() -> None:
+    """Each ticker's trailing volatility is computed only from its own return history."""
+    timestamps = pd.date_range("2024-01-01", periods=4, freq="D", tz="UTC", name="timestamp")
+    panel = _panel(
+        {
+            "A": [100.0, 105.0, 100.0, 105.0],
+            "B": [100.0, 100.0, 100.0, 100.0],
+        },
+        timestamps,
+    )
+
+    result = trailing_volatility(panel, lookback=2)
+
+    a_returns = np.log([105.0 / 100.0, 100.0 / 105.0, 105.0 / 100.0])
+    expected_a_last = np.std(a_returns[-2:], ddof=1)
+    assert result[(timestamps[-1], "A")] == pytest.approx(expected_a_last)
+    assert result[(timestamps[-1], "B")] == pytest.approx(0.0)
+
+
+def test_trailing_volatility_nan_during_warmup() -> None:
+    """Fewer than `lookback` daily returns available should be NaN, not raise."""
+    timestamps = pd.date_range("2024-01-01", periods=2, freq="D", tz="UTC", name="timestamp")
+    panel = _panel({"A": [100.0, 110.0]}, timestamps)
+
+    result = trailing_volatility(panel, lookback=5)
+
+    assert result.isna().all()
 
 
 def test_combine_signals_averages_cross_sectional_zscores() -> None:
