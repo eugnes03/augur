@@ -5,7 +5,12 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from augur.portfolio import apply_rebalance_frequency, equal_weight, rank_weight
+from augur.portfolio import (
+    apply_rebalance_frequency,
+    equal_weight,
+    rank_weight,
+    volatility_target_weight,
+)
 
 
 @st.composite
@@ -66,6 +71,42 @@ def test_rank_weight_raises_when_selection_exceeds_universe() -> None:
     """n_long + n_short > available tickers must raise, not silently overlap."""
     with pytest.raises(ValueError, match="n_long \\+ n_short"):
         rank_weight(_momentum(), n_long=4, n_short=4)
+
+
+def test_volatility_target_weight_known_expected_weights() -> None:
+    """Sizing within each side is inversely proportional to volatility, dollar-neutral."""
+    momentum = _momentum()
+    volatility = pd.Series([0.1, 0.3, 0.2, 0.2, 0.3, 0.1], index=momentum.index)
+
+    result = volatility_target_weight(momentum, volatility, n_long=2, n_short=2)
+
+    # Long side (A, B) inverse vols 10, 3.333 -> weights 0.75, 0.25.
+    # Short side (E, F) inverse vols 3.333, 10 -> weights -0.25, -0.75.
+    expected = pd.Series(
+        [0.75, 0.25, 0.0, 0.0, -0.25, -0.75],
+        index=["A", "B", "C", "D", "E", "F"],
+    )
+    pd.testing.assert_series_equal(result, expected)
+    assert result.sum() == pytest.approx(0.0)
+
+
+def test_volatility_target_weight_lower_vol_gets_bigger_weight() -> None:
+    """Within a side, the lower-volatility name should get the larger weight magnitude."""
+    momentum = _momentum()
+    volatility = pd.Series([0.5, 0.1, 0.2, 0.2, 0.1, 0.5], index=momentum.index)
+
+    result = volatility_target_weight(momentum, volatility, n_long=2, n_short=2)
+
+    assert result["B"] > result["A"] > 0.0
+    assert abs(result["E"]) > abs(result["F"])
+
+
+def test_volatility_target_weight_raises_when_selection_exceeds_universe() -> None:
+    """n_long + n_short > available tickers must raise, not silently overlap."""
+    momentum = _momentum()
+    volatility = pd.Series(1.0, index=momentum.index)
+    with pytest.raises(ValueError, match="n_long \\+ n_short"):
+        volatility_target_weight(momentum, volatility, n_long=4, n_short=4)
 
 
 def test_equal_weight_allows_selection_exactly_covering_universe() -> None:

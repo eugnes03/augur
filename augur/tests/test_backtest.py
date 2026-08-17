@@ -129,7 +129,7 @@ def test_run_backtest_uses_next_day_return_not_same_day(
     # genuinely different, wrong number rather than a distinction without a difference.
     panel = backtest._load_panel(config)
     combined_signal = backtest._combined_signal(panel, config)
-    weights = backtest._daily_weights(combined_signal, config)
+    weights = backtest._daily_weights(panel, combined_signal, config)
     weights = portfolio.apply_rebalance_frequency(weights, config.rebalance_frequency)
     forward_returns = backtest._forward_returns(panel)
     same_day_returns = pnl.strategy_returns(weights, forward_returns).dropna()
@@ -157,6 +157,46 @@ def test_benchmark_returns_uses_forward_shifted_log_returns(
 
     expected = pd.Series(index_returns[1:], index=_session_close_index("2024-01-02", 3))
     pd.testing.assert_series_equal(result, expected, check_names=False)
+
+
+def test_daily_weights_volatility_target_sizes_by_inverse_volatility(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    With weighting_scheme="volatility_target", the selected ticker with lower trailing
+    volatility should get the larger weight magnitude, unlike equal_weight's flat sizing.
+    """
+    # AAA oscillates by +-0.01 each day, BBB by +-0.10 (ten times the swing), CCC trends
+    # down. On the final day AAA and BBB are both up (long picks, n_long=2) and CCC is down
+    # (the lone short pick, n_short=1); reversal never warms up in this six-day panel, so
+    # momentum alone decides the picks.
+    aaa_returns = [0.0, 0.01, -0.01, 0.01, -0.01, 0.01]
+    bbb_returns = [0.0, 0.10, -0.10, 0.10, -0.10, 0.10]
+    ccc_returns = [0.0, -0.05, 0.03, -0.05, 0.03, -0.05]
+    bars = {
+        "AAA": _make_bars(aaa_returns, "2024-01-02"),
+        "BBB": _make_bars(bbb_returns, "2024-01-02"),
+        "CCC": _make_bars(ccc_returns, "2024-01-02"),
+    }
+    monkeypatch.setattr(ingest, "fetch_universe_bars", _fake_fetch_universe_bars(bars))
+    config = Config(
+        start="2024-01-02",
+        end="2024-01-16",
+        momentum_lookback=1,
+        reversal_lookback=10,
+        n_long=2,
+        n_short=1,
+        weighting_scheme="volatility_target",
+        volatility_lookback=2,
+    )
+    panel = backtest._load_panel(config)
+    combined_signal = backtest._combined_signal(panel, config)
+
+    weights = backtest._daily_weights(panel, combined_signal, config)
+
+    last_row = weights.iloc[-1]
+    assert last_row["AAA"] > last_row["BBB"] > 0.0
+    assert last_row["CCC"] < 0.0
 
 
 def test_daily_weights_returns_zero_row_when_below_warmup_threshold() -> None:
@@ -189,7 +229,7 @@ def test_daily_weights_returns_zero_row_when_below_warmup_threshold() -> None:
     # Only AAA has a real signal on warm_date: 1 available ticker < n_long + n_short (2).
     combined_signal = pd.Series([1.0, np.nan, np.nan, 1.0, 0.5, -1.0], index=index)
 
-    result = backtest._daily_weights(combined_signal, config)
+    result = backtest._daily_weights(pd.DataFrame(), combined_signal, config)
 
     assert (result.loc[warm_date] == 0.0).all()
     assert result.loc[live_date, "AAA"] == 1.0
