@@ -53,6 +53,31 @@ def rank_weight(momentum: pd.Series, n_long: int, n_short: int) -> pd.Series:
     return weights
 
 
+def volatility_target_weight(
+    momentum: pd.Series, volatility: pd.Series, n_long: int, n_short: int
+) -> pd.Series:
+    """
+    Dollar-neutral inverse-volatility-weighted portfolio: longs top `n_long`,
+    shorts bottom `n_short` by momentum, sized within each side in proportion
+    to 1/volatility so a name's own vol -- not its rank -- sets its size.
+    Raises if n_long + n_short exceeds available tickers.
+    """
+    _validate_selection_size(momentum, n_long, n_short)
+    # kind="stable": ties keep their input order instead of quicksort's.
+    ranked = momentum.sort_values(ascending=False, kind="stable")
+    weights = pd.Series(0.0, index=momentum.index)
+
+    long_tickers = ranked.index[:n_long]
+    long_inverse_vol = 1.0 / volatility[long_tickers]
+    weights[long_tickers] = long_inverse_vol / long_inverse_vol.sum()
+
+    short_tickers = ranked.index[-n_short:]
+    short_inverse_vol = 1.0 / volatility[short_tickers]
+    weights[short_tickers] = -short_inverse_vol / short_inverse_vol.sum()
+
+    return weights
+
+
 def apply_rebalance_frequency(weights: pd.DataFrame, frequency: int) -> pd.DataFrame:
     """Recompute weights only every `frequency`-th row (by position), forward-filling in between."""
     is_rebalance_day = np.arange(len(weights)) % frequency == 0

@@ -14,6 +14,14 @@ def short_term_reversal(panel: pd.DataFrame, lookback: int) -> pd.Series:
     return -trailing_momentum(panel, lookback)
 
 
+def trailing_volatility(panel: pd.DataFrame, lookback: int) -> pd.Series:
+    """Trailing `lookback`-day realized volatility (std of daily log returns), per ticker."""
+    daily_returns = panel['adj_close'].groupby(level='ticker').transform(
+        lambda s: log_return(s, periods=1)
+    )
+    return daily_returns.groupby(level='ticker').transform(lambda s: s.rolling(lookback).std())
+
+
 def combine_signals(
     signals: dict[str, pd.Series], weights: dict[str, float] | None = None
 ) -> pd.Series:
