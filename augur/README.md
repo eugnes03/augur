@@ -2,7 +2,7 @@
 
 A small quantitative research framework for backtesting a cross-sectional
 long/short equity strategy, built with point-in-time correctness and
-lookahead-safe alignment as first-class concerns rather than afterthoughts.
+lookahead-safe alignment.
 
 ## Pipeline
 
@@ -70,3 +70,4 @@ not yet implemented:
 - Live execution
 - Automated parameter optimization (the current sweep in
   `scripts/param_sweep.py` is diagnostic, not an optimizer)
+- ML based alpha (look at issues)
